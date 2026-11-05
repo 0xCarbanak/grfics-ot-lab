@@ -130,6 +130,24 @@ services:
     # Optional if you want to override default CMD
     # command: sh -c "./simulation/simulation & cd modbus && ./run_all.sh"
 
+  # Lightweight attacker container — your foothold on the OT network.
+  # Use this instead of scanning from localhost (WSL2 can't route to Docker subnets).
+  # Shell in with: docker exec -it attacker sh
+  attacker:
+    image: alpine:latest
+    container_name: attacker
+    hostname: attacker
+    command: sh -c "apk add --no-cache nmap python3 py3-pip tcpdump curl net-tools scapy --quiet && pip install pymodbus --break-system-packages --quiet && echo 'Ready — docker exec -it attacker sh' && sleep infinity"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      b-ics-net:
+        ipv4_address: 192.168.95.100
+      c-dmz-net:
+        ipv4_address: 192.168.90.6
+    restart: unless-stopped
+
   # Kali removed — attack from your own WSL box instead.
   # pip install pymodbus scapy python-nmap
   # The remote I/O devices and PLC are reachable via the port mappings below.

@@ -94,26 +94,32 @@ Wait about a minute for everything to initialise, then open:
 
 ## Start Attacking
 
-From your own machine — no Kali needed:
+WSL2 can't route directly into Docker bridge networks, so the lab includes a lightweight Alpine attacker container sitting on both the ICS and DMZ networks. Shell into it:
 
 ```bash
-pip install pymodbus
-python3
+docker exec -it attacker sh
 ```
+
+You're now at `192.168.95.100` on the plant floor with nmap, python3, pymodbus, tcpdump, and scapy. Start scanning:
+
+```bash
+nmap -sn 192.168.95.0/24
+```
+
+Or use pymodbus to talk to the PLC:
 
 ```python
-from pymodbus.client import ModbusTcpClient
-
-client = ModbusTcpClient("localhost", port=502)
-client.connect()
-
-# Read sensor values
-result = client.read_input_registers(address=100, count=13)
-print(result.registers)
-
-# That's it. No login. No token. Figure out the rest.
-client.close()
+python3
+>>> from pymodbus.client import ModbusTcpClient
+>>> client = ModbusTcpClient("192.168.95.2", port=502)
+>>> client.connect()
+>>> result = client.read_input_registers(address=100, count=13)
+>>> print(result.registers)
 ```
+
+No login. No token. Figure out the rest.
+
+You can also hit services from your browser via localhost port mappings (see table above).
 
 Reference docs in `reference/` explain the protocol, register map, and plant process. Missions in `missions/` guide your learning from recon through to building defences.
 
@@ -169,7 +175,7 @@ This lab is based on [GRFICSv3](https://github.com/Fortiphyd/GRFICSv3) by [Forti
 
 | Component | Why |
 |-----------|-----|
-| **Kali attacker container** (~4 GB image) | Attack from your own WSL/Linux box instead. You already have nmap, Wireshark, Python. `pip install pymodbus` is all you need. |
+| **Kali attacker container** (~4 GB image) | Replaced with a ~70 MB Alpine container that auto-installs nmap, python3, pymodbus, tcpdump, and scapy on startup. Same network position (ICS + DMZ), 98% less disk. |
 | **MITRE Caldera** (~40 MB + container) | C2 framework — overkill for learning ICS fundamentals. |
 
 ### Modified
