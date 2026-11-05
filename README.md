@@ -45,99 +45,96 @@ The lab simulates a **Tennessee Eastman chemical plant** with a real PLC (OpenPL
 ## Prerequisites
 
 - **WSL2** (Windows) or any **Linux** distro
-- **Docker Desktop** with WSL2 integration enabled (Windows), or Docker Engine (Linux)
-- At least **8 GB RAM** allocated to Docker
-- **~6 GB** disk space for Docker images
+- **Native Docker Engine** (not Docker Desktop — see why below)
+- At least **8 GB RAM** and **~6 GB** disk for images
 - **Python 3** with `pymodbus` for attacking: `pip install pymodbus`
 
-### WSL2 Setup (Windows)
+### Why native Docker Engine, not Docker Desktop
 
-1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-2. Open Docker Desktop > **Settings > Resources > WSL Integration** > enable for your distro
-3. Restart WSL: open PowerShell and run `wsl --shutdown`, then reopen your terminal
-4. Add your user to the docker group (one-time):
-   ```bash
-   sudo usermod -aG docker $USER
-   ```
-5. Restart WSL again, then verify:
-   ```bash
-   docker ps
-   ```
+Docker Desktop runs the Docker daemon inside its own lightweight VM, so the
+lab's networks (`192.168.95.0/24`, `192.168.90.0/24`) are hidden from your
+shell — you can't scan or ARP-spoof them, only reach services through
+`localhost` port mappings. That is not a realistic OT assessment.
 
-### Linux Setup
-
-1. Install Docker Engine: https://docs.docker.com/engine/install/
-2. Add your user to the docker group:
-   ```bash
-   sudo usermod -aG docker $USER
-   newgrp docker
-   ```
+Running Docker Engine **natively** in WSL2 (or on real Linux) puts the bridge
+networks directly in your network namespace. You scan `192.168.95.0/24`, run
+MITM, and pivot exactly like you would against a real plant floor. This is how
+GRFICS is designed to be used.
 
 ## Quick Start
+
+### WSL2 (Windows) or Linux — automated
+
+The bootstrap script installs native Docker Engine, the Compose v2 plugin,
+starts the lab, and prints the subnet to scan:
 
 ```bash
 git clone https://github.com/0xCarbanak/grfics-ot-lab.git
 cd grfics-ot-lab
+sudo ./scripts/setup-wsl.sh
+```
 
-# Pull prebuilt images and start the core lab
-docker compose pull
-docker compose up -d
+On WSL2, if Docker Desktop integration is enabled for your distro, the script
+will tell you to turn it off first (**Docker Desktop > Settings > Resources >
+WSL Integration**, disable for your distro, then `wsl --shutdown` in PowerShell
+and reopen). That frees the Docker socket for the native engine.
 
-# Start the SIEM stack (Wazuh + Zeek) — optional but recommended
+Make sure systemd is enabled in WSL2 (`/etc/wsl.conf`):
+
+```ini
+[boot]
+systemd=true
+```
+
+### Manual
+
+```bash
+# After native Docker Engine is installed and running:
 docker compose --profile siem pull
 docker compose --profile siem up -d
 ```
 
-Wait about a minute for everything to initialise, then open:
-- `http://localhost` — 3D plant visualisation
-- `http://localhost:5601` — Wazuh SIEM dashboard
+Wait ~1 minute, then open `http://localhost` (3D plant) and
+`http://localhost:5601` (Wazuh SIEM).
 
 ## Start Attacking
 
-All Modbus devices are accessible from your WSL/Linux machine via localhost. A `modbus-proxy` container handles port forwarding into the Docker networks.
-
-### Modbus Port Map
-
-| Port | Device | What you'll read |
-|------|--------|-----------------|
-| `localhost:502` | PLC | Control registers, coils, setpoints |
-| `localhost:10502` | Feed 1 | Valve position, flow rate |
-| `localhost:11502` | Feed 2 | Valve position, flow rate |
-| `localhost:12502` | Purge | Valve position, flow rate |
-| `localhost:13502` | Product | Valve position, flow rate |
-| `localhost:14502` | Tank | Pressure, level |
-| `localhost:15502` | Analyzer | Composition A, B, C |
-
-### Quick test
+With native Docker the OT subnets are real interfaces on your machine. Confirm:
 
 ```bash
-pip install pymodbus
-python3
+ip addr | grep -E 'br-|192.168.9'     # Docker bridges present
+nmap -sn 192.168.95.0/24              # discover the plant floor
 ```
+
+You'll see the PLC (`.2`), engineering workstation (`.5`), all six remote I/O
+devices (`.10`–`.15`), the simulation (`.45`), and the router (`.200`). Then go
+deeper with your own tools — `nmap -sV`, Wireshark, `pymodbus`, `scapy`, MITM:
 
 ```python
 from pymodbus.client import ModbusTcpClient
 
-# Talk to the PLC
-client = ModbusTcpClient("localhost", port=502)
+# The PLC — straight to its real IP, no port tricks
+client = ModbusTcpClient("192.168.95.2", port=502)
 client.connect()
-result = client.read_input_registers(address=100, count=13)
-print(result.registers)
+print(client.read_input_registers(address=100, count=13).registers)
 client.close()
 
-# Talk directly to the Tank
-client = ModbusTcpClient("localhost", port=14502)
+# A remote I/O device directly (the Tank)
+client = ModbusTcpClient("192.168.95.14", port=502)
 client.connect()
-result = client.read_input_registers(1, count=2)
-print(f"Pressure: {result.registers[0]}, Level: {result.registers[1]}")
+r = client.read_input_registers(1, count=2)
+print(f"Pressure: {r.registers[0]}, Level: {r.registers[1]}")
 client.close()
 ```
 
 No login. No token. Figure out the rest.
 
-Web UIs are accessible via your browser at the ports listed in the table above.
+Web UIs are reachable from your browser on `localhost` (WSL forwards published
+ports to Windows): `:80`, `:8080`, `:6081`, `:6080`, `:5601`.
 
-Reference docs in `reference/` explain the protocol, register map, and plant process. Missions in `missions/` guide your learning from recon through to building defences.
+Reference docs in `reference/` explain the protocol, register map, and plant
+process. Missions in `missions/` guide your learning from recon through to
+building defences.
 
 ## Missions
 
@@ -191,23 +188,22 @@ This lab is based on [GRFICSv3](https://github.com/Fortiphyd/GRFICSv3) by [Forti
 
 | Component | Why |
 |-----------|-----|
-| **Kali attacker container** (~4 GB image) | Replaced with a ~5 MB socat proxy container that forwards all Modbus ports to localhost. Attack from your own machine with your own tools. |
-| **MITRE Caldera** (~40 MB + container) | C2 framework — overkill for learning ICS fundamentals. |
+| **Kali attacker container** (~4 GB image) | Attack from your own machine. With native Docker Engine the OT subnets are directly routable, so you use your own nmap, Wireshark, pymodbus and scapy against `192.168.95.0/24` — no bundled attacker VM needed. |
+| **MITRE Caldera** (~40 MB + container) | Automated C2/adversary-emulation framework — overkill for learning ICS fundamentals by hand. |
 
 ### Modified
 
 | Change | Why |
 |--------|-----|
-| **Networks: macvlan → bridge** | WSL2 doesn't support VLAN sub-interfaces (`eth0.95`, `eth0.90`) that macvlan needs. Bridge networks use the same subnets and IPs so everything still works. Trade-off: no true L2 VLAN isolation between ICS and DMZ — both share a broadcast domain. The router still routes between them, but ARP spoofing across zones works where it wouldn't on real VLANs. |
-| **PLC: added port 502 mapping** | Original only exposed the web dashboard (8080). We added `502:502` so you can hit Modbus TCP directly from the host. |
+| **Networks: macvlan → bridge** | The original uses macvlan with 802.1Q VLAN sub-interfaces (`eth0.95`, `eth0.90`), which require a VLAN-capable parent NIC that WSL2 doesn't provide. Bridge networks use the same subnets and IPs, and — crucially — on native Docker they are routable from your host so you can scan and attack them directly. Trade-off: no true L2 VLAN isolation between ICS and DMZ (they share a broadcast domain); the router still routes between zones, but cross-zone ARP spoofing works where it wouldn't on real VLANs. |
 
 ### Added
 
 | Addition | What it is |
 |----------|-----------|
+| `scripts/setup-wsl.sh` | One-shot bootstrap: installs native Docker Engine + Compose v2, handles the Docker Desktop handoff, starts the full lab, and prints the routable subnet. Takes a fresh WSL2/Linux box to a working lab in one command. |
 | `reference/MODBUS_PROTOCOL.md` | Modbus TCP protocol reference — function codes, data model, the lab's full register map, pymodbus examples. |
 | `reference/PLANT_PROCESS.md` | Tennessee Eastman process explained — how the plant works, normal parameters, safety mechanisms, what each attack target does. |
-| `modbus-proxy` container | Socat-based port forwarder exposing all 6 remote I/O Modbus devices to localhost (10502-15502). Needed because WSL2 can't route into Docker bridge networks. |
 | `missions/` (7 JSON files) | CTF-style learning missions. Recon → enumeration → process manipulation → safety override → MITM → DoS → defence. Each has objectives, learning points, things to think about, flags, and blue-team checks. No pre-made attack scripts. |
 
 ## Credits
