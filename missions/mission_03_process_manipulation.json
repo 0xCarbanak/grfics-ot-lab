@@ -1,0 +1,31 @@
+{
+  "id": "M03",
+  "title": "Your First Write",
+  "difficulty": "medium",
+  "category": "Exploitation",
+  "description": "Now you know the register map across the six Remote I/O modules. Time to write something. But think before you type — in the Tennessee Eastman process, every change has a physical consequence. Adjust a feed rate slightly. Watch what happens to pressure, level, and composition. Understand cause and effect before you push harder. The PLC at 192.168.95.2 is running a control loop that scans every 20ms — it will fight your changes unless you find the right way around it.",
+  "objectives": [
+    "Write to a holding register on one of the Remote I/O modules and observe the effect on the plant",
+    "Understand the relationships: feed rates affect level, level affects pressure, composition shifts change reaction dynamics",
+    "Discover the PLC coil %QX0.0 (manual_mode) — understand what happens when it's set versus cleared",
+    "Push reactor pressure above normal (~2700 kPa) toward the override threshold (~2900 kPa)",
+    "Notice the PLC's control loop overwriting your changes — figure out why and how to persist your writes"
+  ],
+  "learning_points": [
+    "The PLC scans every 20ms — it reads Remote I/O inputs, runs Tennessee Eastman control logic, and writes outputs back",
+    "Your Modbus writes compete with the PLC's writes. Unless you outpace the scan cycle or disable automatic control, the PLC wins",
+    "The %QX0.0 coil (manual_mode) is a key attack vector — it determines whether the PLC actively controls the process or leaves outputs alone",
+    "Small changes in feed composition propagate through the reactor — the Tennessee Eastman process is intentionally unstable in open loop",
+    "In a real plant, what seems like a minor tweak can cascade into a pressure excursion or composition upset"
+  ],
+  "things_to_think_about": [
+    "Why did the PLC override your change? What does its 20ms scan cycle mean for an attacker?",
+    "What's the difference between changing a setpoint and directly overriding an actuator output?",
+    "How does manual_mode (%QX0.0) change the playing field for an attacker?",
+    "If you were the operator watching the HMI, would you have noticed what you just did?",
+    "Watch the 3D plant visualization at localhost:80 — can you see the physical effect of your writes?"
+  ],
+  "flag_hint": "The flag is the PLC coil address (IEC 61131-3 notation) that enables manual mode, the key to persistent process manipulation: FLAG{address}",
+  "flag": "FLAG{QX0.0}",
+  "blue_team_check": "Check the Suricata alert log on the router for Modbus write function codes crossing the network. How many writes did you send before the process visibly changed? Would a rate-based alert have caught you?"
+}

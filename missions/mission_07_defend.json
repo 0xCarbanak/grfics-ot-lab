@@ -1,0 +1,31 @@
+{
+  "id": "M07",
+  "title": "Switch Sides: Build Defences",
+  "difficulty": "hard",
+  "category": "Defence",
+  "description": "You've seen how easy it is to attack an unprotected OT network running the Tennessee Eastman process. Now build the defences. The router at 192.168.95.200 / 192.168.90.200 already runs iptables and Suricata — but the rules may not be enough. Use what you learned from the attack side to inform what you monitor, what you block, and what you alert on. The best OT defenders are the ones who've attacked these systems.",
+  "objectives": [
+    "Review the Suricata alert logs on the router from your previous missions — what was detected, what was missed?",
+    "Harden the iptables rules on the router to restrict which hosts can reach the ICS subnet from the DMZ",
+    "Write Suricata rules that detect specific Modbus attack patterns: writes to safety-critical coils, high-frequency register reads, unusual source IPs",
+    "Lock down the OpenPLC web dashboard on the PLC (192.168.95.2:8080) — change defaults, restrict access",
+    "Replay your attacks from Missions 03-06 and verify they're now blocked, detected, or detected faster"
+  ],
+  "learning_points": [
+    "Network segmentation between the DMZ (192.168.90.0/24) and ICS network (192.168.95.0/24) is the single most effective OT defence",
+    "The router is the choke point — iptables for access control, Suricata for detection — both need tuning for ICS protocols",
+    "Allow-listing (only known-good Modbus traffic patterns) works better than deny-listing in OT environments",
+    "Detection rules should be informed by real attack patterns — your missions give you exactly the signatures to write",
+    "OT monitoring needs to understand the process, not just packets — a write to %QX0.0 or %QX5.0 is far more significant than a write to a non-safety register"
+  ],
+  "things_to_think_about": [
+    "How would you balance security controls with the need for operators to respond quickly in an emergency?",
+    "Which of your earlier attacks would have been caught earliest with better Suricata rules?",
+    "The HMI needs to poll Remote I/O devices across the router — you can't just block all Modbus traffic. How do you allow legitimate traffic while blocking attacks?",
+    "What's the minimum set of monitoring that every OT network should have?",
+    "Could you detect the MITM attack from Mission 05 with Suricata alone, or do you need something else?"
+  ],
+  "flag_hint": null,
+  "flag": null,
+  "blue_team_check": "You ARE the blue team now. Verify your defences work by replaying earlier attacks. For each mission (03-06), confirm: (1) the attack is blocked or detected, (2) the alert fires within seconds, and (3) you could identify the attacker's source IP from the logs."
+}

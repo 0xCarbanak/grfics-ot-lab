@@ -1,0 +1,30 @@
+{
+  "id": "M02",
+  "title": "Understanding the Process",
+  "difficulty": "easy",
+  "category": "Enumeration",
+  "description": "You've found six Remote I/O modules on the ICS network (192.168.95.10-15), each speaking Modbus TCP on port 502 with slave ID 247 and no authentication at all. Before you start changing things, you need to understand what the Tennessee Eastman process is actually doing. Each Remote I/O handles a different part of the plant — Feed1, Feed2, Purge, Product, Tank, and Analyzer. Read their registers, figure out the data model, and build a picture of the plant state.",
+  "objectives": [
+    "Connect to each Remote I/O module using pymodbus and read its holding and input registers",
+    "Map which Remote I/O handles which process variable (feed rates, purge, product, tank level, composition)",
+    "Cross-reference what you read via Modbus with what the HMI (ScadaLTS) displays",
+    "Determine the normal steady-state values: pressure around 2700 kPa, level around 44%, composition A around 47%",
+    "Build your own register map documenting which addresses on which device map to which process variables"
+  ],
+  "learning_points": [
+    "Modbus registers are just 16-bit numbers — you need process context to understand them",
+    "Holding registers (FC 0x03) are writable; input registers (FC 0x04) are read-only — know the difference",
+    "The Tennessee Eastman process has interdependent variables: feed rates affect composition, which affects reaction rate, which affects pressure and temperature",
+    "Having six separate Modbus devices mirrors real plants where I/O is distributed across marshalling cabinets",
+    "The register map is the key to understanding — and later attacking — any Modbus-based process"
+  ],
+  "things_to_think_about": [
+    "You just read the entire state of an industrial chemical process with no credentials whatsoever",
+    "In a real engagement without documentation, how would you figure out which register does what?",
+    "Why are holding registers and input registers split across different function codes?",
+    "How does the PLC at 192.168.95.2 relate to these Remote I/O modules — who reads what, who writes what?"
+  ],
+  "flag_hint": "The flag is the normal steady-state reactor pressure (kPa, rounded to nearest 100) and level (%): FLAG{pressure_level}",
+  "flag": "FLAG{2700_44}",
+  "blue_team_check": "The router's Suricata instance may have rules for Modbus function codes. Check whether your enumeration of all six Remote I/O devices generated any alerts. How many read requests did it take to map the whole process?"
+}

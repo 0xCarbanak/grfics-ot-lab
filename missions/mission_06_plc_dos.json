@@ -1,0 +1,31 @@
+{
+  "id": "M06",
+  "title": "Killing the Controller",
+  "difficulty": "medium",
+  "category": "Availability",
+  "description": "In OT, availability is everything. A PLC that stops scanning means the Tennessee Eastman process runs uncontrolled — valves freeze at their last position, safety checks stop executing, and physics keeps going. The PLC at 192.168.95.2 runs OpenPLC with a web management dashboard on port 8080. The Modbus service handles process I/O on port 502. Explore what happens when the controller goes away, and think about how trivially it can be disrupted.",
+  "objectives": [
+    "Flood the PLC's Modbus port (192.168.95.2:502) with rapid requests and observe the effect on scan cycle timing",
+    "Find and access the OpenPLC web dashboard on port 8080 — explore what the management interface lets you do",
+    "Stop the PLC runtime through the management interface and watch what happens to the plant and Remote I/O modules",
+    "Observe how the Tennessee Eastman process behaves with no active control (actuators frozen, open-loop dynamics)",
+    "Restart the PLC runtime and see how long it takes the process to recover to steady state"
+  ],
+  "learning_points": [
+    "PLCs are resource-constrained devices — they can't handle the traffic volumes a web server can",
+    "When a PLC stops scanning, actuators hold their last commanded state — the process continues with no feedback control",
+    "The Tennessee Eastman process is open-loop unstable — without active control, pressure and composition will drift toward dangerous conditions",
+    "OpenPLC's web dashboard (default creds openplc/openplc) gives full control over the runtime — start, stop, upload new programs",
+    "Recovery isn't instant — the process may have drifted far from safe operating conditions during the outage"
+  ],
+  "things_to_think_about": [
+    "Why is 'turn it off and on again' dangerous in OT but routine in IT?",
+    "If the PLC froze with feed valves wide open and the purge valve closed, what happens to reactor pressure?",
+    "The OpenPLC dashboard uses HTTP with default credentials — how would you protect this in a real deployment?",
+    "What's the difference between crashing a web server and crashing a process controller that's keeping pressure below 3200 kPa?",
+    "How long can the Tennessee Eastman process run safely without active PLC control?"
+  ],
+  "flag_hint": "The flag is the default OpenPLC web dashboard credentials (user_pass): FLAG{user_pass}",
+  "flag": "FLAG{openplc_openplc}",
+  "blue_team_check": "Check the router's Suricata logs for high-frequency connection alerts and unusual traffic to port 8080. If the PLC runtime stops, the Remote I/O modules stop getting polled — that silence is itself a detectable anomaly. How quickly could you detect a PLC outage from network traffic alone?"
+}

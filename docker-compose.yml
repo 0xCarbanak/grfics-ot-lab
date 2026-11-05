@@ -1,0 +1,268 @@
+# NOTE networks had to be prepended with letters to ensure 
+# proper alphabetical order 
+
+services:
+  simulation:
+    image: fortiphyd/grfics-simulation
+    container_name: simulation
+    hostname: simulation
+    build:
+      context: ./simulation
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "55555"]
+      interval: 5s
+      retries: 5
+    dns:
+      - 192.168.95.200
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      a-grfics-admin:
+        priority: 10
+      b-ics-net:
+        ipv4_address: 192.168.95.45
+        priority: 100
+
+    # Optional if you want to override default CMD
+    # command: sh -c "./simulation/simulation & cd modbus && ./run_all.sh"
+
+  plc:
+    image: fortiphyd/grfics-plc
+    container_name: plc
+    hostname: plc
+    build:
+      context: ./plc
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "8080:8080"    # OpenPLC web dashboard
+      - "502:502"      # Modbus TCP (attack from host)
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    dns:
+      - 192.168.95.200
+    networks:
+      a-grfics-admin:
+        priority: 10
+      b-ics-net:
+        ipv4_address: 192.168.95.2
+        priority: 100
+    volumes:
+      - plc_volume:/docker_persistent
+
+    # Optional if you want to override default CMD
+    # command: sh -c "./simulation/simulation & cd modbus && ./run_all.sh"
+
+
+  ews:
+    image: fortiphyd/grfics-workstation
+    container_name: EWS
+    hostname: EWS
+    build:
+      context: ./workstation
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "6080:6080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:6080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    dns:
+      - 192.168.95.200
+    networks:
+      a-grfics-admin:
+        priority: 10
+      b-ics-net:
+        ipv4_address: 192.168.95.5
+        priority: 100
+
+    # Optional if you want to override default CMD
+    # command: sh -c "./simulation/simulation & cd modbus && ./run_all.sh"
+
+  hmi:
+    image: fortiphyd/grfics-scadalts
+    container_name: HMI
+    build:
+      context: ./scadalts
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    dns:
+      - 192.168.90.200
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "6081:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      a-grfics-admin:
+        priority: 10
+      c-dmz-net:
+        ipv4_address: 192.168.90.107
+        priority: 100
+    volumes:
+      - scadalts_db:/var/lib/mysql
+    # Optional if you want to override default CMD
+    # command: sh -c "./simulation/simulation & cd modbus && ./run_all.sh"
+
+  # Kali removed — attack from your own WSL box instead.
+  # pip install pymodbus scapy python-nmap
+  # The remote I/O devices and PLC are reachable via the port mappings below.
+
+  router:
+    image: fortiphyd/grfics-router
+    container_name: router
+    hostname: router
+    build:
+      context: ./router
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "ip route | grep -q 192.168.95.0 || exit 1"]
+      interval: 5s
+      retries: 5
+    cap_add:
+     - NET_ADMIN
+     - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: '1'
+    environment:
+      - FWUI_SECRET_KEY=some-long-secret-you-generate
+    ports:
+     - "51820:51820/udp"
+    volumes:
+     - router_config:/etc/firewall
+    networks:
+      a-grfics-admin:
+      b-ics-net:
+        ipv4_address: 192.168.95.200
+      c-dmz-net:
+        ipv4_address: 192.168.90.200
+
+  wazuh:
+    profiles: [siem]
+    image: fortiphyd/grfics-wazuh
+    container_name: wazuh
+    hostname: wazuh
+    build:
+      context: ./wazuh
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    restart: unless-stopped
+    ports:
+      - "1514:1514"     # Wazuh agent enrollment
+      - "1515:1515"     # Wazuh agent communication
+      - "55000:55000"   # Wazuh REST API
+      - "5601:5601"     # Dashboard HTTP
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - wazuh_manager_data:/var/ossec
+      - wazuh_indexer_data:/var/lib/wazuh-indexer
+    dns:
+      - 192.168.90.200
+    networks:
+      a-grfics-admin:
+        priority: 10
+      c-dmz-net:
+        ipv4_address: 192.168.90.20
+        priority: 100
+
+  zeek:
+    profiles: [siem]
+    image: fortiphyd/grfics-zeek
+    container_name: zeek
+    hostname: zeek
+    build:
+      context: ./zeek
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-unknown}
+        BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    restart: unless-stopped
+    # Without this, libpcap can't put mirror0 into promiscuous mode (it
+    # needs CAP_NET_ADMIN in this netns, not just the CAP_NET_RAW Docker
+    # grants by default) - the mirrored frames keep their original
+    # source/dest MACs, which never match mirror0's own, so a
+    # non-promiscuous capture silently receives nothing. Found live: the
+    # interface's own kernel rx counters showed real traffic arriving
+    # while zeek's stats.log reported pkts_proc=0 the entire time.
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - 192.168.90.200
+    networks:
+      a-grfics-admin:
+        priority: 10
+      c-dmz-net:
+        ipv4_address: 192.168.90.30
+        priority: 100
+    # c-dmz-net membership is only for a normal, attributable reporting
+    # identity (matches how every other agent reports from a real subnet
+    # IP, not an admin-bridge one) - it does NOT capture traffic. Traffic
+    # visibility comes entirely from a "mirror0" interface that only
+    # exists once an instructor separately runs zeek/enable-mirror.sh on
+    # the host (see docs/zeek-network-mirroring-design.md). Same [siem]
+    # profile as wazuh, since it's useless without a manager to ship logs
+    # to.
+
+networks:
+  # WSL2 patch: macvlan with VLAN sub-interfaces (eth0.95/eth0.90) is not
+  # supported on WSL2. Using bridge networks with the same subnets instead.
+  # This means ICS and DMZ share the same L2 domain (no true VLAN isolation)
+  # but all hardcoded IPs and routing still work.
+  b-ics-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.95.0/24
+          gateway: 192.168.95.1
+
+  c-dmz-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.90.0/24
+          gateway: 192.168.90.1
+
+  a-grfics-admin:
+    driver: bridge
+
+volumes:
+  scadalts_db:
+    name: scadalts_db
+  plc_volume:
+    name: plc_volume
+  router_config:
+    name: router_config
+  wazuh_manager_data:
+    name: wazuh_manager_data
+  wazuh_indexer_data:
+    name: wazuh_indexer_data

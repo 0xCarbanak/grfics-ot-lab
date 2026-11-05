@@ -1,0 +1,31 @@
+{
+  "id": "M01",
+  "title": "Network Reconnaissance",
+  "difficulty": "easy",
+  "category": "Reconnaissance",
+  "description": "You're sitting on a Kali box (192.168.90.6) inside the DMZ of a Tennessee Eastman chemical plant. Somewhere across the network, a PLC is controlling a chemical process, Remote I/O modules are reading sensors and driving actuators, and an HMI is letting operators see what's happening. Two subnets, a router in between, and you don't have a map. Build one. Remember this is OT, so be mindful of what your scans might do to the systems you're probing.",
+  "objectives": [
+    "Discover live hosts on your local DMZ subnet (192.168.90.0/24)",
+    "Discover hosts on the ICS subnet (192.168.95.0/24) beyond the router",
+    "Identify the PLC, HMI, Engineering Workstation, Remote I/O modules, and 3D plant sim",
+    "Determine what services and protocols are listening on each host",
+    "Access the HMI web interface and the PLC management dashboard — understand what each shows you",
+    "Find the Modbus-speaking devices and note how many there are"
+  ],
+  "learning_points": [
+    "OT networks are commonly segmented into zones — a DMZ, a control network, and sometimes a safety network",
+    "Modbus TCP (port 502) is one of the most common ICS protocols — and has zero built-in authentication",
+    "A router between zones may be running IDS (like Suricata) — your scans may be logged or blocked",
+    "Many ICS devices expose web interfaces for configuration that are often left at default credentials",
+    "The Tennessee Eastman process is a realistic chemical benchmark — feed mixing, reaction, separation, and recycle"
+  ],
+  "things_to_think_about": [
+    "What would happen if an aggressive nmap scan crashed a Remote I/O module mid-process?",
+    "The router sits on both subnets at .200 — what role does it play beyond routing?",
+    "How many Modbus devices did you find? Why are there more than just a PLC?",
+    "What services did you find that would never exist on a typical corporate network?"
+  ],
+  "flag_hint": "The flag is the Modbus slave ID shared by all Remote I/O devices concatenated with the total number of Remote I/O modules: FLAG{slaveid_count}",
+  "flag": "FLAG{247_6}",
+  "blue_team_check": "The router at 192.168.95.200 runs Suricata IDS. After your recon, check its alert log. Did your scans trigger any signatures? What did the defenders see crossing between subnets?"
+}

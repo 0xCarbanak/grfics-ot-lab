@@ -1,0 +1,31 @@
+{
+  "id": "M04",
+  "title": "Defeating the Safety Logic",
+  "difficulty": "medium",
+  "category": "Exploitation",
+  "description": "The PLC has safety interlocks built into its logic. When reactor pressure approaches ~2900 kPa, an override kicks in. The emergency stop coil %QX5.0 (run_bit) can shut the whole process down. The maximum safe pressure is around 3200 kPa — beyond that, things go very wrong. Your job is to understand these safety mechanisms, then figure out how to push past them. This is the line between nuisance and catastrophic in ICS attacks.",
+  "objectives": [
+    "Push the Tennessee Eastman process toward the pressure override threshold (~2900 kPa) and observe what happens",
+    "Identify the run_bit coil (%QX5.0) and understand how the PLC uses it as an emergency stop",
+    "Read the PLC's Structured Text program to understand the exact safety thresholds and logic",
+    "Figure out how to hold the process in an unsafe state — above 2900 kPa — with safety logic overridden",
+    "Push toward 3200 kPa and observe what happens to the 3D plant visualization"
+  ],
+  "learning_points": [
+    "Safety interlocks are the last line of defence — defeating them is what separates an annoyance from a disaster",
+    "The PLC re-evaluates safety conditions every scan cycle (20ms) — you need continuous writes or logic modification to stay ahead",
+    "In real plants, safety instrumented systems (SIS) are separate from the control PLC — this lab combines them, which is a common real-world shortcut that weakens security",
+    "Understanding the PLC program (Structured Text) gives you the exact thresholds, coil addresses, and logic flow to defeat",
+    "The Tennessee Eastman process becomes increasingly unstable as pressure rises — nonlinear dynamics mean small pushes have big consequences"
+  ],
+  "things_to_think_about": [
+    "How fast do you need to write to outpace the PLC's 20ms scan cycle?",
+    "Could you modify the PLC program itself through the OpenPLC web interface (port 8080) instead of racing the scan cycle?",
+    "In a real plant with a dedicated SIS on separate hardware, would this approach still work?",
+    "What would a Stuxnet-style attack look like here? (hint: modify the PLC logic, not the I/O values)",
+    "The gap between 2900 kPa (override) and 3200 kPa (max safe) — how much time does that margin give an operator to respond?"
+  ],
+  "flag_hint": "The flag is the pressure (kPa) at which the PLC safety override engages: FLAG{pressure}",
+  "flag": "FLAG{2900}",
+  "blue_team_check": "This should generate significant alerts on the router's Suricata IDS — high-frequency Modbus writes, especially to coil addresses. Check for alerts related to safety-critical register writes. How much warning did the blue team get before pressure hit the override threshold?"
+}

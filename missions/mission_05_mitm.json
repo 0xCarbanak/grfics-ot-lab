@@ -1,0 +1,31 @@
+{
+  "id": "M05",
+  "title": "Blinding the Operator",
+  "difficulty": "hard",
+  "category": "Advanced Exploitation",
+  "description": "The most dangerous ICS attacks aren't just about breaking things — they're about breaking things while the operator sees normal readings. If the ScadaLTS HMI shows 2700 kPa while the reactor is actually climbing past 3000 kPa, the operator won't intervene until it's far too late. The HMI at 192.168.90.107 polls the Remote I/O modules on the 192.168.95.0/24 network — all those Modbus responses cross the router. Figure out how to intercept that traffic and forge the sensor readings the HMI receives.",
+  "objectives": [
+    "Understand how Modbus TCP responses are structured (transaction ID, unit ID, function code, data payload)",
+    "Figure out the network path between the HMI (192.168.90.107) and the Remote I/O devices (192.168.95.10-15)",
+    "Position yourself to intercept Modbus traffic — consider the router at .200 on both subnets",
+    "Modify sensor values in Modbus responses so the HMI shows normal readings (pressure ~2700, level ~44%)",
+    "Simultaneously push the actual process toward danger — have the 3D visualization and HMI showing contradictory states"
+  ],
+  "learning_points": [
+    "Modbus TCP has no integrity protection, no authentication, no encryption — responses can be modified in transit",
+    "ARP spoofing or routing manipulation can redirect traffic through an attacker-controlled proxy",
+    "The operator's view of the process is only as trustworthy as the network path between HMI and field devices",
+    "This is the pattern behind real-world ICS attacks: Stuxnet falsified centrifuge speed readings, TRITON targeted safety systems while masking the attack",
+    "The two-subnet architecture (DMZ + ICS) with a router in between creates specific interception opportunities"
+  ],
+  "things_to_think_about": [
+    "How would you detect this attack from the network side? Think about timing — a proxy adds latency to Modbus responses",
+    "The router runs Suricata — could it detect modified Modbus payloads, or only connection metadata?",
+    "What if the plant had an independent safety display that read directly from hardwired sensors, bypassing the network entirely?",
+    "Why is network segmentation between HMI and PLC important even though both are supposedly trusted?",
+    "With six Remote I/O devices, how many Modbus streams do you need to intercept to fully blind the operator?"
+  ],
+  "flag_hint": "The flag is the Modbus function code for reading input registers (the type of response you need to forge): FLAG{fc_number}",
+  "flag": "FLAG{4}",
+  "blue_team_check": "This is the hardest attack to detect. Check for ARP anomalies on both subnets, timing changes in Modbus poll-response cycles, or unusual MAC-to-IP mappings on the router. What monitoring would you add to catch this?"
+}
