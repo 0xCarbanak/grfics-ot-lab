@@ -156,8 +156,9 @@ services:
       net.ipv4.ip_forward: '1'
     environment:
       - FWUI_SECRET_KEY=some-long-secret-you-generate
-    ports:
-     - "51820:51820/udp"
+    # WireGuard port not published to host — the router is reachable on its
+    # real IPs (192.168.95.200 / 192.168.90.200) via the bridge networks.
+    # Publishing 51820/udp conflicts with Docker Desktop or host WireGuard.
     volumes:
      - router_config:/etc/firewall
     networks:
