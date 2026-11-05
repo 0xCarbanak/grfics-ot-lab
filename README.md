@@ -63,10 +63,32 @@ GRFICS is designed to be used.
 
 ## Quick Start
 
-### WSL2 (Windows) or Linux — automated
+### Step 0: Disable Docker Desktop WSL Integration (if installed)
 
-The bootstrap script installs native Docker Engine, the Compose v2 plugin,
-starts the lab, and prints the subnet to scan:
+If you have Docker Desktop on Windows, it hijacks the Docker socket inside WSL
+and routes everything through its own VM — the OT subnets won't be routable
+from your shell. You **must** disable it:
+
+1. Open **Docker Desktop** on Windows
+2. Go to **Settings → Resources → WSL Integration**
+3. **Toggle OFF** your WSL distro (e.g. Ubuntu)
+4. Open **PowerShell** and run: `wsl --shutdown`
+5. Reopen your WSL terminal
+
+If you don't have Docker Desktop installed at all, skip this.
+
+### Step 1: Enable systemd in WSL2
+
+Edit `/etc/wsl.conf` (create it if it doesn't exist):
+
+```ini
+[boot]
+systemd=true
+```
+
+Then restart WSL (`wsl --shutdown` in PowerShell, reopen terminal).
+
+### Step 2: Run the setup script
 
 ```bash
 git clone https://github.com/0xCarbanak/grfics-ot-lab.git
@@ -74,22 +96,23 @@ cd grfics-ot-lab
 sudo ./scripts/setup-wsl.sh
 ```
 
-On WSL2, if Docker Desktop integration is enabled for your distro, the script
-will tell you to turn it off first (**Docker Desktop > Settings > Resources >
-WSL Integration**, disable for your distro, then `wsl --shutdown` in PowerShell
-and reopen). That frees the Docker socket for the native engine.
+The script installs native Docker Engine + Compose v2 plugin, starts the full
+lab, and prints the routable subnets. One command from zero to a working lab.
 
-Make sure systemd is enabled in WSL2 (`/etc/wsl.conf`):
-
-```ini
-[boot]
-systemd=true
-```
-
-### Manual
+### Step 3: Verify the subnets are routable
 
 ```bash
-# After native Docker Engine is installed and running:
+ip addr | grep -E 'br-|192.168.9'     # Docker bridge interfaces
+nmap -sn 192.168.95.0/24              # discover the ICS plant floor
+nmap -sn 192.168.90.0/24              # discover the DMZ
+```
+
+If you see the bridge interfaces and nmap finds hosts, you're good. Attack from
+your own box — `pymodbus`, `scapy`, `nmap`, Wireshark, whatever you want.
+
+### Manual setup (if you already have native Docker Engine)
+
+```bash
 docker compose --profile siem pull
 docker compose --profile siem up -d
 ```
@@ -99,16 +122,10 @@ Wait ~1 minute, then open `http://localhost` (3D plant) and
 
 ## Start Attacking
 
-With native Docker the OT subnets are real interfaces on your machine. Confirm:
-
-```bash
-ip addr | grep -E 'br-|192.168.9'     # Docker bridges present
-nmap -sn 192.168.95.0/24              # discover the plant floor
-```
-
 You'll see the PLC (`.2`), engineering workstation (`.5`), all six remote I/O
-devices (`.10`–`.15`), the simulation (`.45`), and the router (`.200`). Then go
-deeper with your own tools — `nmap -sV`, Wireshark, `pymodbus`, `scapy`, MITM:
+devices (`.10`–`.15`), the simulation (`.45`), and the router (`.200`). Go
+deeper with `nmap -sV`, Wireshark, `pymodbus`, `scapy`, MITM — whatever you
+want:
 
 ```python
 from pymodbus.client import ModbusTcpClient
@@ -129,8 +146,9 @@ client.close()
 
 No login. No token. Figure out the rest.
 
-Web UIs are reachable from your browser on `localhost` (WSL forwards published
-ports to Windows): `:80`, `:8080`, `:6081`, `:6080`, `:5601`.
+Web UIs are reachable from your Windows browser on `localhost` (WSL auto-forwards
+published ports): `:80` (3D plant), `:8080` (OpenPLC), `:6081` (HMI), `:6080`
+(EWS), `:5601` (Wazuh).
 
 Reference docs in `reference/` explain the protocol, register map, and plant
 process. Missions in `missions/` guide your learning from recon through to
