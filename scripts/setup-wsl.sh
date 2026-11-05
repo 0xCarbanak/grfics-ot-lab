@@ -30,15 +30,28 @@ echo "=================================================================="
 echo
 
 # --- 1. Detect Docker Desktop interference --------------------------------
-if [ -L /usr/bin/docker ] && readlink /usr/bin/docker | grep -q docker-desktop; then
-  warn "Docker Desktop WSL integration is active in this distro."
-  warn "It owns /usr/bin/docker and /var/run/docker.sock, which will fight"
-  warn "the native engine. For a clean setup, in Docker Desktop go to:"
+# Check if Docker Desktop is actually RUNNING (has a live socket), not just
+# whether a stale symlink exists — DD leaves the symlink behind after you
+# disable WSL integration.
+DD_ACTIVE=false
+if [ -S /var/run/docker.sock ] && docker info --format '{{.OperatingSystem}}' 2>/dev/null | grep -qi "Docker Desktop"; then
+  DD_ACTIVE=true
+fi
+
+if [ "$DD_ACTIVE" = true ]; then
+  warn "Docker Desktop is RUNNING and owns the Docker socket in this distro."
+  warn "It will fight the native engine. In Docker Desktop go to:"
   warn "    Settings > Resources > WSL Integration > turn OFF for this distro"
   warn "then run 'wsl --shutdown' in PowerShell, reopen, and re-run this script."
   echo
   read -rp "Continue anyway and let native Docker take over the socket? [y/N] " a
   [[ "${a:-N}" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 1; }
+fi
+
+# Remove stale Docker Desktop symlink so apt-installed docker.io takes over
+if [ -L /usr/bin/docker ] && readlink /usr/bin/docker | grep -q docker-desktop; then
+  log "Removing stale Docker Desktop symlink at /usr/bin/docker..."
+  rm -f /usr/bin/docker
 fi
 
 # --- 2. Install Docker Engine ---------------------------------------------

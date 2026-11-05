@@ -76,12 +76,12 @@ but matters in a real plant.
 
 ## Access Points
 
-| System                  | URL                    | Credentials          |
-|-------------------------|------------------------|---------------------|
-| 3D Plant Visualisation  | http://localhost       | —                   |
-| PLC (OpenPLC)           | http://localhost:8080  | openplc / openplc   |
-| HMI (ScadaLTS)          | http://localhost:6081  | admin / admin       |
-| Engineering Workstation | http://localhost:6080  | (noVNC desktop)     |
-| Kali Attacker           | http://localhost:6088  | kali / kali         |
-| MITRE Caldera           | http://localhost:8888  | red / fortiphyd-red |
-| Wazuh SIEM              | http://localhost:5601  | (siem profile)      |
+| System                  | URL / IP                        | Credentials          |
+|-------------------------|---------------------------------|---------------------|
+| 3D Plant Visualisation  | http://localhost                 | —                   |
+| PLC (OpenPLC)           | http://localhost:8080            | openplc / openplc   |
+| PLC Modbus              | 192.168.95.2:502                | **none**            |
+| HMI (ScadaLTS)          | http://localhost:6081            | admin / admin       |
+| Engineering Workstation | http://localhost:6080            | (noVNC desktop)     |
+| Remote I/O devices      | 192.168.95.10-15:502            | **none** (slave 247)|
+| Wazuh SIEM              | http://localhost:5601            | (siem profile)      |

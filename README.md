@@ -63,10 +63,38 @@ GRFICS is designed to be used.
 
 ## Quick Start
 
-### WSL2 (Windows) or Linux — automated
+### Step 0: Deal with Docker Desktop (if installed)
 
-The bootstrap script installs native Docker Engine, the Compose v2 plugin,
-starts the lab, and prints the subnet to scan:
+Docker Desktop runs its own VM and grabs ports that conflict with the native
+Docker Engine this lab needs. If you have Docker Desktop on Windows:
+
+1. **Quit Docker Desktop completely** — right-click the whale icon in your
+   system tray → **Quit Docker Desktop**. It must not be running when the lab
+   is up, or it will fight over ports and block containers from starting.
+2. **Disable WSL Integration** for your distro so it stops injecting its CLI:
+   Open Docker Desktop → **Settings → Resources → WSL Integration** → toggle
+   **OFF** for your WSL distro (e.g. Ubuntu, Kali).
+3. Open **PowerShell** and run: `wsl --shutdown`
+4. Reopen your WSL terminal
+
+> **Important:** Docker Desktop must stay **quit** while the lab is running.
+> If you start it again later, it will bind the same ports and containers
+> will fail with "address already in use" errors.
+
+If you don't have Docker Desktop installed at all, skip this.
+
+### Step 1: Enable systemd in WSL2
+
+Edit `/etc/wsl.conf` (create it if it doesn't exist):
+
+```ini
+[boot]
+systemd=true
+```
+
+Then restart WSL (`wsl --shutdown` in PowerShell, reopen terminal).
+
+### Step 2: Run the setup script
 
 ```bash
 git clone https://github.com/0xCarbanak/grfics-ot-lab.git
@@ -74,22 +102,23 @@ cd grfics-ot-lab
 sudo ./scripts/setup-wsl.sh
 ```
 
-On WSL2, if Docker Desktop integration is enabled for your distro, the script
-will tell you to turn it off first (**Docker Desktop > Settings > Resources >
-WSL Integration**, disable for your distro, then `wsl --shutdown` in PowerShell
-and reopen). That frees the Docker socket for the native engine.
+The script installs native Docker Engine + Compose v2 plugin, starts the full
+lab, and prints the routable subnets. One command from zero to a working lab.
 
-Make sure systemd is enabled in WSL2 (`/etc/wsl.conf`):
-
-```ini
-[boot]
-systemd=true
-```
-
-### Manual
+### Step 3: Verify the subnets are routable
 
 ```bash
-# After native Docker Engine is installed and running:
+ip addr | grep -E 'br-|192.168.9'     # Docker bridge interfaces
+nmap -sn 192.168.95.0/24              # discover the ICS plant floor
+nmap -sn 192.168.90.0/24              # discover the DMZ
+```
+
+If you see the bridge interfaces and nmap finds hosts, you're good. Attack from
+your own box — `pymodbus`, `scapy`, `nmap`, Wireshark, whatever you want.
+
+### Manual setup (if you already have native Docker Engine)
+
+```bash
 docker compose --profile siem pull
 docker compose --profile siem up -d
 ```
@@ -99,16 +128,10 @@ Wait ~1 minute, then open `http://localhost` (3D plant) and
 
 ## Start Attacking
 
-With native Docker the OT subnets are real interfaces on your machine. Confirm:
-
-```bash
-ip addr | grep -E 'br-|192.168.9'     # Docker bridges present
-nmap -sn 192.168.95.0/24              # discover the plant floor
-```
-
 You'll see the PLC (`.2`), engineering workstation (`.5`), all six remote I/O
-devices (`.10`–`.15`), the simulation (`.45`), and the router (`.200`). Then go
-deeper with your own tools — `nmap -sV`, Wireshark, `pymodbus`, `scapy`, MITM:
+devices (`.10`–`.15`), the simulation (`.45`), and the router (`.200`). Go
+deeper with `nmap -sV`, Wireshark, `pymodbus`, `scapy`, MITM — whatever you
+want:
 
 ```python
 from pymodbus.client import ModbusTcpClient
@@ -129,8 +152,9 @@ client.close()
 
 No login. No token. Figure out the rest.
 
-Web UIs are reachable from your browser on `localhost` (WSL forwards published
-ports to Windows): `:80`, `:8080`, `:6081`, `:6080`, `:5601`.
+Web UIs are reachable from your Windows browser on `localhost` (WSL auto-forwards
+published ports): `:80` (3D plant), `:8080` (OpenPLC), `:6081` (HMI), `:6080`
+(EWS), `:5601` (Wazuh).
 
 Reference docs in `reference/` explain the protocol, register map, and plant
 process. Missions in `missions/` guide your learning from recon through to
