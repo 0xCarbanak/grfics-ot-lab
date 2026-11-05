@@ -130,22 +130,43 @@ services:
     # Optional if you want to override default CMD
     # command: sh -c "./simulation/simulation & cd modbus && ./run_all.sh"
 
-  # Lightweight attacker container — your foothold on the OT network.
-  # Use this instead of scanning from localhost (WSL2 can't route to Docker subnets).
-  # Shell in with: docker exec -it attacker sh
-  attacker:
+  # Port forwarder — exposes all Modbus devices to localhost so you can
+  # attack directly from your WSL/Linux box. No need to shell into containers.
+  #   localhost:10502 -> Feed 1    (192.168.95.10:502)
+  #   localhost:11502 -> Feed 2    (192.168.95.11:502)
+  #   localhost:12502 -> Purge     (192.168.95.12:502)
+  #   localhost:13502 -> Product   (192.168.95.13:502)
+  #   localhost:14502 -> Tank      (192.168.95.14:502)
+  #   localhost:15502 -> Analyzer  (192.168.95.15:502)
+  #   localhost:502   -> PLC       (already mapped on plc service)
+  modbus-proxy:
     image: alpine:latest
-    container_name: attacker
-    hostname: attacker
-    command: sh -c "apk add --no-cache nmap python3 py3-pip tcpdump curl net-tools scapy --quiet && pip install pymodbus --break-system-packages --quiet && echo 'Ready — docker exec -it attacker sh' && sleep infinity"
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
+    container_name: modbus-proxy
+    hostname: modbus-proxy
+    depends_on:
+      - simulation
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache socat --quiet
+        socat TCP-LISTEN:10502,fork,reuseaddr TCP:192.168.95.10:502 &
+        socat TCP-LISTEN:11502,fork,reuseaddr TCP:192.168.95.11:502 &
+        socat TCP-LISTEN:12502,fork,reuseaddr TCP:192.168.95.12:502 &
+        socat TCP-LISTEN:13502,fork,reuseaddr TCP:192.168.95.13:502 &
+        socat TCP-LISTEN:14502,fork,reuseaddr TCP:192.168.95.14:502 &
+        socat TCP-LISTEN:15502,fork,reuseaddr TCP:192.168.95.15:502 &
+        wait
+    ports:
+      - "10502:10502"
+      - "11502:11502"
+      - "12502:12502"
+      - "13502:13502"
+      - "14502:14502"
+      - "15502:15502"
     networks:
       b-ics-net:
-        ipv4_address: 192.168.95.100
-      c-dmz-net:
-        ipv4_address: 192.168.90.6
+        ipv4_address: 192.168.95.99
     restart: unless-stopped
 
   # Kali removed — attack from your own WSL box instead.

@@ -94,32 +94,48 @@ Wait about a minute for everything to initialise, then open:
 
 ## Start Attacking
 
-WSL2 can't route directly into Docker bridge networks, so the lab includes a lightweight Alpine attacker container sitting on both the ICS and DMZ networks. Shell into it:
+All Modbus devices are accessible from your WSL/Linux machine via localhost. A `modbus-proxy` container handles port forwarding into the Docker networks.
+
+### Modbus Port Map
+
+| Port | Device | What you'll read |
+|------|--------|-----------------|
+| `localhost:502` | PLC | Control registers, coils, setpoints |
+| `localhost:10502` | Feed 1 | Valve position, flow rate |
+| `localhost:11502` | Feed 2 | Valve position, flow rate |
+| `localhost:12502` | Purge | Valve position, flow rate |
+| `localhost:13502` | Product | Valve position, flow rate |
+| `localhost:14502` | Tank | Pressure, level |
+| `localhost:15502` | Analyzer | Composition A, B, C |
+
+### Quick test
 
 ```bash
-docker exec -it attacker sh
+pip install pymodbus
+python3
 ```
-
-You're now at `192.168.95.100` on the plant floor with nmap, python3, pymodbus, tcpdump, and scapy. Start scanning:
-
-```bash
-nmap -sn 192.168.95.0/24
-```
-
-Or use pymodbus to talk to the PLC:
 
 ```python
-python3
->>> from pymodbus.client import ModbusTcpClient
->>> client = ModbusTcpClient("192.168.95.2", port=502)
->>> client.connect()
->>> result = client.read_input_registers(address=100, count=13)
->>> print(result.registers)
+from pymodbus.client import ModbusTcpClient
+
+# Talk to the PLC
+client = ModbusTcpClient("localhost", port=502)
+client.connect()
+result = client.read_input_registers(address=100, count=13)
+print(result.registers)
+client.close()
+
+# Talk directly to the Tank
+client = ModbusTcpClient("localhost", port=14502)
+client.connect()
+result = client.read_input_registers(1, count=2)
+print(f"Pressure: {result.registers[0]}, Level: {result.registers[1]}")
+client.close()
 ```
 
 No login. No token. Figure out the rest.
 
-You can also hit services from your browser via localhost port mappings (see table above).
+Web UIs are accessible via your browser at the ports listed in the table above.
 
 Reference docs in `reference/` explain the protocol, register map, and plant process. Missions in `missions/` guide your learning from recon through to building defences.
 
@@ -175,7 +191,7 @@ This lab is based on [GRFICSv3](https://github.com/Fortiphyd/GRFICSv3) by [Forti
 
 | Component | Why |
 |-----------|-----|
-| **Kali attacker container** (~4 GB image) | Replaced with a ~70 MB Alpine container that auto-installs nmap, python3, pymodbus, tcpdump, and scapy on startup. Same network position (ICS + DMZ), 98% less disk. |
+| **Kali attacker container** (~4 GB image) | Replaced with a ~5 MB socat proxy container that forwards all Modbus ports to localhost. Attack from your own machine with your own tools. |
 | **MITRE Caldera** (~40 MB + container) | C2 framework — overkill for learning ICS fundamentals. |
 
 ### Modified
@@ -191,6 +207,7 @@ This lab is based on [GRFICSv3](https://github.com/Fortiphyd/GRFICSv3) by [Forti
 |----------|-----------|
 | `reference/MODBUS_PROTOCOL.md` | Modbus TCP protocol reference — function codes, data model, the lab's full register map, pymodbus examples. |
 | `reference/PLANT_PROCESS.md` | Tennessee Eastman process explained — how the plant works, normal parameters, safety mechanisms, what each attack target does. |
+| `modbus-proxy` container | Socat-based port forwarder exposing all 6 remote I/O Modbus devices to localhost (10502-15502). Needed because WSL2 can't route into Docker bridge networks. |
 | `missions/` (7 JSON files) | CTF-style learning missions. Recon → enumeration → process manipulation → safety override → MITM → DoS → defence. Each has objectives, learning points, things to think about, flags, and blue-team checks. No pre-made attack scripts. |
 
 ## Credits
