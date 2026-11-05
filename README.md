@@ -63,17 +63,23 @@ GRFICS is designed to be used.
 
 ## Quick Start
 
-### Step 0: Disable Docker Desktop WSL Integration (if installed)
+### Step 0: Deal with Docker Desktop (if installed)
 
-If you have Docker Desktop on Windows, it hijacks the Docker socket inside WSL
-and routes everything through its own VM — the OT subnets won't be routable
-from your shell. You **must** disable it:
+Docker Desktop runs its own VM and grabs ports that conflict with the native
+Docker Engine this lab needs. If you have Docker Desktop on Windows:
 
-1. Open **Docker Desktop** on Windows
-2. Go to **Settings → Resources → WSL Integration**
-3. **Toggle OFF** your WSL distro (e.g. Ubuntu)
-4. Open **PowerShell** and run: `wsl --shutdown`
-5. Reopen your WSL terminal
+1. **Quit Docker Desktop completely** — right-click the whale icon in your
+   system tray → **Quit Docker Desktop**. It must not be running when the lab
+   is up, or it will fight over ports and block containers from starting.
+2. **Disable WSL Integration** for your distro so it stops injecting its CLI:
+   Open Docker Desktop → **Settings → Resources → WSL Integration** → toggle
+   **OFF** for your WSL distro (e.g. Ubuntu, Kali).
+3. Open **PowerShell** and run: `wsl --shutdown`
+4. Reopen your WSL terminal
+
+> **Important:** Docker Desktop must stay **quit** while the lab is running.
+> If you start it again later, it will bind the same ports and containers
+> will fail with "address already in use" errors.
 
 If you don't have Docker Desktop installed at all, skip this.
 
